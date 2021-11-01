@@ -51,7 +51,7 @@ enum ADE_REGISTERS {
     NISUM=0x43C7,       /*Summ of IAWV+IBWV+ICWV*/
 
     /*Internal DSP Memory RAM Registers*/
-    RUN=0xE228          /*Run register starts or stop the DSP*/
+    RUN=0xE228,          /*Run register starts or stop the DSP*/
 
     /*Configuration and Power Quality Registers*/
     IPEAK=0xE500,       /*Current PEAK register. See Fig. 58 and tab. 33*/
@@ -84,7 +84,23 @@ enum ADE_REGISTERS {
 
     PHNOLOAD=0xE608,    /*Phase no load register, R, Tab. 40*/
 
+    VTHDN=0xE886,       /*Total harmonic distortion plus noise of phase voltage, R*/
+    ITHDN=0xE887,       /*Total harmonic distortion plus noise of phase current, R*/
 
+    HXVRMS=0xE888,      /*The rms value of the phase voltage harmonic X, R*/
+    HXIRMS=0xE889,      /*The rms value of the phase current harmonic X, R*/
+    HXVHD=0xE88E,       /*Harmonic distortion of the phase voltage harmonic X relative to the fundamental, R*/
+    HXIHD=0xE88F,       /*Harmonic distortion of the phase voltage harmonic X relative to the fundamental, R*/
+
+    HYVRMS=0xE890,      /*The rms value of the phase voltage harmonic Y, R*/
+    HYIRMS=0xE891,      /*The rms value of the phase current harmonic Y, R*/
+    HYVHD=0xE896,       /*Harmonic distortion of the phase voltage harmonic X relative to the fundamental, R*/
+    HYIHD=0xE897,       /*Harmonic distortion of the phase voltage harmonic X relative to the fundamental, R*/
+
+    HZVRMS=0xE898,      /*The rms value of the phase voltage harmonic Z, R*/
+    HZIRMS=0xE899,      /*The rms value of the phase current harmonic Z, R*/
+    HZVHD=0xE89E,       /*Harmonic distortion of the phase voltage harmonic X relative to the fundamental, R*/
+    HZIHD=0xE89F,       /*Harmonic distortion of the phase voltage harmonic X relative to the fundamental, R*/
 
 };
 
