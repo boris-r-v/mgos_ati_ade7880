@@ -102,6 +102,7 @@ enum ADE_REGISTERS {
     HZVHD=0xE89E,       /*Harmonic distortion of the phase voltage harmonic X relative to the fundamental, R*/
     HZIHD=0xE89F,       /*Harmonic distortion of the phase voltage harmonic X relative to the fundamental, R*/
 
+    CONFIG2=0xEC01      /*Configuration reg, R/W see Tab.55*/
 };
 
 #endif //MGOS_SPI_ADE7880_REGISTERS_H

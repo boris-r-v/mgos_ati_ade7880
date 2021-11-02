@@ -7,8 +7,6 @@
 #include "mgos_gpio.h"
 #include "mgos_timers.h"
 #include "mgos-spi-ade7880.h"
-#include "mgos-spi-ade7880-registers.h"
-
 
 static const uint8_t ROM_CS = 5;
 static const uint8_t AD_CS = 22;
@@ -29,15 +27,20 @@ void timer_cb_ad(void *arg) {
     LOG(LL_INFO, ("ADE7880 clock %d, CHECKSUM: %08X", _step, data) );
 
     ati_spi_ade7880_read32( ade, &data, STATUS0);
-    LOG(LL_INFO, ("ADE7880 clock %d, STATUS0: %08X", _step, data) );
+    LOG(LL_INFO, ("ADE7880 clock %d, STATUS0: %X", _step, data) );
 
     ati_spi_ade7880_read32( ade, &data, STATUS1);
-    LOG(LL_INFO, ("ADE7880 clock %d, STATUS1: %08X", _step, data) );
+    LOG(LL_INFO, ("ADE7880 clock %d, STATUS1: %X", _step, data) );
 
-/*    uint32_t bdata[8];
-    ati_spi_ade7880_read( ade, (uint8_t*)bdata, sizeof(bdata), AIRMS);
-    LOG(LL_INFO, ("ADE7880 clock %d, AIRMS: %08X %08X %08X %08X %08X", _step, bdata[0], bdata[1], bdata[2], bdata[3], bdata[4] ) );
-*/
+    uint16_t run;
+    ati_spi_ade7880_read16( ade, &run, 0xE228);
+    LOG(LL_INFO, ("ADE7880 clock %d, RUN: %X", _step, run) );
+
+    uint32_t arms=0, brms=0, crms=0;
+    ati_spi_ade7880_read32( ade, &arms, AVRMS);
+    ati_spi_ade7880_read32( ade, &brms, BVRMS);
+    ati_spi_ade7880_read32( ade, &crms, CVRMS);
+    LOG(LL_INFO, ("ADE7880 READ %d, RMS AV: %X, BV: %X, CV: %X", _step, arms, brms, crms ) );
 
 }
 
@@ -71,7 +74,7 @@ enum mgos_app_init_result mgos_app_init(void)
             .isol_pin = ISOL_CS,
             .spi = spi,
             .mode = 0,
-            .freq = 1000000,    /*1MHz ask freq*/
+            .freq = 10000,    /*10kHz ask freq*/
     };
     ade = ati_spi_ade7880_create( &fl );
     if ( ade == NULL)
