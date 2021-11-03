@@ -13,6 +13,9 @@
 #include "mgos_spi.h"
 #include "mgos-spi-ade7880-impl.h"
 
+enum ADE7880_OP_RET_CODE {ADE7880_OK, ADE7880_FAIL };
+struct ati_spi_ade7880_calibration_data;
+struct ati_spi_ade7880_data;
 struct ati_spi_ade7880_config{
     /**
        * reset_pin - нога сброса микросхемы памяти, низкий уровент более чем на 10us сбрасывает все текущие операции [1] Table 18-4
@@ -39,6 +42,10 @@ struct ati_spi_ade7880_config{
      * SPI frequency in Hz
      */
     uint32_t freq;
+    /**
+     * Указательна структуру с данными калибровки, данный указатель должен быть валиден всегда
+     */
+     struct ati_spi_ade7880_calibration_data* coef;
 };
 struct ati_spi_ade7880;
 /**
@@ -57,6 +64,11 @@ void  ati_spi_ade7880_destroy(struct ati_spi_ade7880* _dev );
  * @param _dev: ADE7880 device
  */
 void ati_spi_ade7880_reset(struct ati_spi_ade7880* _dev );
-
+/**
+ * Get sizing data from ADE
+ * @param _dev: ADE7880 device
+ * @param _data: struct with sizing data
+ */
+void ati_spi_ade7880_get_data(struct ati_spi_ade7880* _dev, struct ati_spi_ade7880_data* _data );
 
 #endif //MGOS_SPI_ADE7880_H

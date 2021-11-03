@@ -7,18 +7,25 @@
 #include "mgos_gpio.h"
 #include "mgos_timers.h"
 #include "mgos-spi-ade7880.h"
+#include "mgos-uns-pa-data.h"
 
 static const uint8_t ROM_CS = 5;
 static const uint8_t AD_CS = 22;
 static const uint8_t ISOL_CS = 23;
 static const uint8_t RESET_PIN = 15;
 static const uint8_t RESET2_PIN = 4;
+static int _step = 0;
 struct mgos_spi *spi;
 struct ati_spi_ade7880* ade;
 
+void print_unspa_data(struct ati_spi_ade7880_data const* _d ){
+    LOG(LL_INFO, ("-------------------------------" ) );
+    LOG(LL_INFO, ("VRMS A:%0.3f, B:%0.3f, C:%0.3f ", _d->Vrms[0], _d->Vrms[1], _d->Vrms[2] ) );
+    LOG(LL_INFO, ("IRMS A:%0.3f, B:%0.3f, C:%0.3f ", _d->Irms[0], _d->Irms[1], _d->Irms[2] ) );
+    LOG(LL_INFO, ("COSf A:%0.3f, B:%0.3f, C:%0.3f ", _d->Cosf[0], _d->Cosf[1], _d->Cosf[2] ) );
+    LOG(LL_INFO, ("-------------------------------" ) );
 
-static int _step = 0;
-
+}
 
 void timer_cb_ad(void *arg) {
     ++_step;
@@ -35,13 +42,18 @@ void timer_cb_ad(void *arg) {
     uint16_t run;
     ati_spi_ade7880_read16( ade, &run, 0xE228);
     LOG(LL_INFO, ("ADE7880 clock %d, RUN: %X", _step, run) );
-
+    if ( 1 != run ){
+        ati_spi_ade7880_reset(ade);
+        mgos_msleep(2000);
+    }
     uint32_t arms=0, brms=0, crms=0;
     ati_spi_ade7880_read32( ade, &arms, AVRMS);
     ati_spi_ade7880_read32( ade, &brms, BVRMS);
     ati_spi_ade7880_read32( ade, &crms, CVRMS);
     LOG(LL_INFO, ("ADE7880 READ %d, RMS AV: %X, BV: %X, CV: %X", _step, arms, brms, crms ) );
-
+    struct ati_spi_ade7880_data ade7880_data;
+    ati_spi_ade7880_get_data( ade, &ade7880_data);
+    print_unspa_data( &ade7880_data );
 }
 
 enum mgos_app_init_result mgos_app_init(void) 
@@ -73,8 +85,9 @@ enum mgos_app_init_result mgos_app_init(void)
             .cs_pin = AD_CS,
             .isol_pin = ISOL_CS,
             .spi = spi,
+            .coef = create_call_coef(),
             .mode = 0,
-            .freq = 10000,    /*10kHz ask freq*/
+            .freq = 1000000,    /*1MHz ask freq*/
     };
     ade = ati_spi_ade7880_create( &fl );
     if ( ade == NULL)

@@ -5,6 +5,9 @@
 #include "mgos_debug.h"
 #include "mgos_gpio.h"
 #include "mgos-spi-ade7880.h"
+#include "mgos-spi-ade7880-impl.h"
+#include "mgos-uns-pa-data.h"
+
 struct ati_spi_ade7880* ati_spi_ade7880_create(struct ati_spi_ade7880_config const* _conf){
     struct ati_spi_ade7880* c = (struct ati_spi_ade7880*) calloc(1, sizeof(*c));
     if (NULL != c ){
@@ -12,6 +15,7 @@ struct ati_spi_ade7880* ati_spi_ade7880_create(struct ati_spi_ade7880_config con
         c->cs_pin = _conf->cs_pin;
         c->isol_pin = _conf->isol_pin;
         c->spi = _conf->spi;
+        c->coef = _conf->coef;
         c->txn.cs = -1; /*CS from over place*/
         c->txn.freq = _conf->freq;
         c->txn.mode = _conf->mode;
@@ -21,7 +25,7 @@ struct ati_spi_ade7880* ati_spi_ade7880_create(struct ati_spi_ade7880_config con
         mgos_gpio_set_mode(c->isol_pin, MGOS_GPIO_MODE_OUTPUT );
         mgos_gpio_write( c->isol_pin, 0 );
         mgos_gpio_write( c->cs_pin, 1 );
-        /*Reset the ADE7880*/
+        /*Hard Reset the ADE7880*/
         ati_spi_ade7880_reset( c );
 
         LOG (LL_INFO, ("UNS-PA SPI ADE7880 init ok (CS/RESET/ISOL: %d/%d/%d)",
@@ -58,7 +62,8 @@ void ati_spi_ade7880_reset(struct ati_spi_ade7880* _dev ) {
         LOG (LL_INFO, ("UNS-PA SPI ADE7880 wait for reset complete" ));
         ati_spi_ade7880_read32(_dev, &rstdone, STATUS1);
     }
-
+    /*Write config to DSP*/
+    ati_spi_ade7880_dsp_write_config( _dev );
     /*Write protect DSP registers*/
     ati_spi_ade7880_dps_reg_write_protection(_dev, true );
     /*Run DSP */
@@ -77,3 +82,195 @@ void  ati_spi_ade7880_destroy(struct ati_spi_ade7880* _dev){
     else
         LOG (LL_ERROR, ("UNS-PA SPI ADE7880 invalid destroy - device not exist!!" ) );
 }
+
+void ati_spi_ade7880_get_data(struct ati_spi_ade7880* _dev, struct ati_spi_ade7880_data* _data ){
+    float VGain = _dev->coef->Coefficients_esp[0];
+    float VOffset = _dev->coef->Coefficients_esp[1];
+    float IGain = _dev->coef->Coefficients_esp[2];
+    float IOffset = _dev->coef->Coefficients_esp[3];
+
+    _data->Vrms[0] = ati_spi_ade7880_get_float( _dev, AVRMS) * VGain + VOffset;
+    _data->Vrms[1] = ati_spi_ade7880_get_float( _dev, BVRMS) * VGain + VOffset;
+    _data->Vrms[2] = ati_spi_ade7880_get_float( _dev, CVRMS) * VGain + VOffset;
+
+    _data->Irms[0] = ati_spi_ade7880_get_float( _dev, AIRMS) * IGain + IOffset;
+    _data->Irms[1] = ati_spi_ade7880_get_float( _dev, BIRMS) * IGain + IOffset;
+    _data->Irms[2] = ati_spi_ade7880_get_float( _dev, CVRMS) * IGain + IOffset;
+}
+
+
+
+
+/**-------------PRIVATE SECTION-------------*/
+
+void ati_spi_ade7880_dsp_write_config( struct ati_spi_ade7880* _dev ){
+    struct ati_spi_ade7880_calibration_data* c = _dev->coef;
+
+    ati_spi_ade7880_write32( _dev, c->VGO_ade[0],  AVGAIN);
+    ati_spi_ade7880_write32( _dev, c->VGO_ade[1],  BVGAIN);
+    ati_spi_ade7880_write32( _dev, c->VGO_ade[2],  CVGAIN);
+    ati_spi_ade7880_write32( _dev, c->VGO_ade[3],  AVRMSOS);
+    ati_spi_ade7880_write32( _dev, c->VGO_ade[4],  BVRMSOS);
+    ati_spi_ade7880_write32( _dev, c->VGO_ade[5],  CVRMSOS);
+
+    ati_spi_ade7880_write32( _dev, c->IGO_ade[0],  AIGAIN);
+    ati_spi_ade7880_write32( _dev, c->IGO_ade[1],  BIGAIN);
+    ati_spi_ade7880_write32( _dev, c->IGO_ade[2],  CIGAIN);
+    ati_spi_ade7880_write32( _dev, c->IGO_ade[3],  AIRMSOS);
+    ati_spi_ade7880_write32( _dev, c->IGO_ade[4],  BIRMSOS);
+    ati_spi_ade7880_write32( _dev, c->IGO_ade[5],  CIRMSOS);
+
+    ati_spi_ade7880_write32( _dev, c->NIGO_ade[0],  NIGAIN);
+    ati_spi_ade7880_write32( _dev, c->NIGO_ade[1],  NIRMSOS);
+
+    ati_spi_ade7880_write32( _dev, c->Thresholds_ade[0],   OILVL);
+    ati_spi_ade7880_write32( _dev, c->Thresholds_ade[1],   OVLVL);
+    ati_spi_ade7880_write32( _dev, c->Thresholds_ade[2],   SAGLVL);
+
+    /*Write ther times to frees pipeline*/
+    ati_spi_ade7880_write32( _dev, c->Thresholds_ade[2],   SAGLVL);
+    ati_spi_ade7880_write32( _dev, c->Thresholds_ade[2],   SAGLVL);
+    ati_spi_ade7880_write32( _dev, c->Thresholds_ade[2],   SAGLVL);
+
+}
+void ati_spi_ade7880_dps_reg_write_protection(struct ati_spi_ade7880* _dev, bool _on_off){
+    if ( _on_off){
+        ati_spi_ade7880_write8( _dev, 0xAD, 0xE7FE );
+        ati_spi_ade7880_write8( _dev, 0x80, 0xE7E3 );
+    }
+    else{
+        ati_spi_ade7880_write8( _dev, 0xAD, 0xE7FE );
+        ati_spi_ade7880_write8( _dev, 0x00, 0xE7E3 );
+    }
+}
+
+static uint8_t ati_spi_ade7880_write_block(struct ati_spi_ade7880* _dev, void const* _data, size_t _data_len, uint16_t _addr );
+static uint8_t ati_spi_ade7880_read_block( struct ati_spi_ade7880* _dev, void* _data, size_t _data_len, uint16_t _addr );
+
+uint8_t ati_spi_ade7880_write8(struct ati_spi_ade7880* _dev, uint8_t _data, uint16_t _addr ){
+    return ati_spi_ade7880_write_block(_dev, &_data, sizeof(uint8_t), _addr );
+}
+uint8_t ati_spi_ade7880_write16(struct ati_spi_ade7880* _dev, uint16_t _data, uint16_t _addr ){
+    uint16_t r = _data>>8 | (_data &0xFF) << 8;
+    return ati_spi_ade7880_write_block(_dev, &r, sizeof(uint16_t), _addr );
+}
+uint8_t ati_spi_ade7880_write32(struct ati_spi_ade7880* _dev, uint32_t _data, uint16_t _addr ){
+    uint32_t r = ((_data & 0xFF) << 24)|((_data & 0xFF00) << 8)|((_data & 0xFF0000) >> 8)|((_data & 0xFF000000) >> 24);
+    return ati_spi_ade7880_write_block(_dev, &r, sizeof(uint32_t), _addr );
+}
+
+uint8_t ati_spi_ade7880_read8( struct ati_spi_ade7880* _dev, uint8_t* _data, uint16_t _addr ){
+    return ati_spi_ade7880_read_block( _dev, _data, sizeof(uint8_t), _addr );
+}
+
+uint8_t ati_spi_ade7880_read16( struct ati_spi_ade7880* _dev, uint16_t* _data, uint16_t _addr ){
+    return ati_spi_ade7880_read_block( _dev, _data, sizeof(uint16_t), _addr );
+}
+
+uint8_t ati_spi_ade7880_read32( struct ati_spi_ade7880* _dev, uint32_t* _data, uint16_t _addr ){
+    return ati_spi_ade7880_read_block( _dev, _data, sizeof(uint32_t), _addr );
+}
+int32_t ati_spi_ade7880_get_int32( struct ati_spi_ade7880* _dev, uint16_t _addr ){
+    uint32_t tmp;
+    ati_spi_ade7880_read32( _dev, &tmp, _addr );
+    return (int32_t)tmp;
+}
+uint32_t ati_spi_ade7880_get_uint32( struct ati_spi_ade7880* _dev, uint16_t _addr ){
+    uint32_t tmp;
+    ati_spi_ade7880_read32( _dev, &tmp, _addr );
+    return tmp;
+}
+float ati_spi_ade7880_get_float( struct ati_spi_ade7880* _dev, uint16_t _addr ){
+    uint32_t tmp;
+    ati_spi_ade7880_read32( _dev, &tmp, _addr );
+    return ((float)tmp)/0x200000;
+}
+
+
+/**
+ * Write some data block to ADE7880
+ * @param _dev: ADE7880 spi device
+ * @param _data: storage for read data
+ * @param _data_len: read data len
+ * @param _addr: 16bits register address
+ * @return: ADE7880_OK if operation successful, or error code in overwise
+ */
+
+static uint8_t ati_spi_ade7880_write_block(struct ati_spi_ade7880* _dev, void const* _data, size_t _data_len, uint16_t _addr ){
+    _dev->txn.cs = -1;
+
+    mgos_gpio_write( _dev->isol_pin, 1 );
+    mgos_gpio_write( _dev->cs_pin, 0 );
+    mgos_usleep(10);
+
+    uint8_t tx_data[3 + _data_len];
+    tx_data[0] = 0x00;
+    tx_data[1] = (_addr >> 8) & 0xff;
+    tx_data[2] = _addr & 0xff;
+    memcpy(tx_data+3, _data, _data_len );
+
+    _dev->txn.hd.tx_len = sizeof( tx_data );
+    _dev->txn.hd.tx_data = tx_data;
+    _dev->txn.hd.dummy_len = 0;
+    _dev->txn.hd.rx_len = 0;
+    _dev->txn.hd.rx_data = NULL;
+
+    uint8_t ret = ADE7880_OK;
+    if (! mgos_spi_run_txn(_dev->spi, false/*half_duplex*/, &_dev->txn) )
+    {
+        LOG(LL_ERROR, ("ati_spi_ade7880_write_block") );
+        ret = ADE7880_FAIL;
+    }
+    mgos_gpio_write( _dev->isol_pin, 0 );
+    mgos_gpio_write( _dev->cs_pin, 1 );
+    return ret;
+}
+/**
+ * Read some data block from ADE7880
+ * @param _dev: ADE7880 spi device
+ * @param _data: storage for read data
+ * @param _data_len: read data len
+ * @param _addr: 16bits register address
+ * @return: ADE7880_OK if operation successful, or error code in overwise
+ */
+static uint8_t ati_spi_ade7880_read_block( struct ati_spi_ade7880* _dev, void* _data, size_t _data_len, uint16_t _addr ){
+    _dev->txn.cs = -1;
+
+    mgos_gpio_write( _dev->isol_pin, 1 );
+    mgos_gpio_write( _dev->cs_pin, 0 );
+    mgos_usleep(10);
+    uint8_t tx_data[3];
+    tx_data[0] = 0x01;
+    tx_data[1] = (_addr >> 8) & 0xff;
+    tx_data[2] = _addr & 0xff;
+
+    _dev->txn.hd.tx_len = sizeof( tx_data );
+    _dev->txn.hd.tx_data = tx_data;
+    _dev->txn.hd.dummy_len = 0;
+    _dev->txn.hd.rx_len = _data_len;
+    uint8_t rx_data[_data_len];
+    _dev->txn.hd.rx_data = rx_data;
+
+    uint8_t ret = ADE7880_OK;
+    if (! mgos_spi_run_txn(_dev->spi, false/*half_duplex*/, &_dev->txn) )
+    {
+        LOG(LL_ERROR, ("ati_spi_ade7880_read_block") );
+        ret = ADE7880_FAIL;
+    }
+    mgos_gpio_write( _dev->isol_pin, 0 );
+    mgos_gpio_write( _dev->cs_pin, 1 );
+    /**
+     * Data shifts into the ADE7880 at the MOSI logic input on the falling edge of SCLK and the ADE7880 samples it on the rising edge of SCLK.
+     * Data shifts out of the ADE7880 at the MISO logic output on a falling edge of SCLK and can be sampled by the master device on the raising edge of SCLK.
+     * The most significant bit of the word is shifted in and out first.
+     * The maximum serial clock frequency supported by this interface is 2.5 MHz.
+     * Т.к. esp32 - это little-endian - то нужно перевернуть полученные байты
+     */
+    int i;
+    uint8_t* r = _data;
+    for (i=0; i < _data_len; ++i){
+        *(r+i) = rx_data[_data_len-1-i];
+    }
+    return ret;
+}
+/*-----------------*/
