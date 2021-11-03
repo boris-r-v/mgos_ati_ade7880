@@ -14,20 +14,30 @@ static const uint8_t AD_CS = 22;
 static const uint8_t ISOL_CS = 23;
 static const uint8_t RESET_PIN = 15;
 static const uint8_t RESET2_PIN = 4;
-static int _step = 0;
+
 struct mgos_spi *spi;
 struct ati_spi_ade7880* ade;
 
-void print_unspa_data(struct ati_spi_ade7880_data const* _d ){
+void print_unspa_data(struct ati_spi_ade7880_sizing_data const* _d ){
     LOG(LL_INFO, ("-------------------------------" ) );
     LOG(LL_INFO, ("VRMS A:%0.3f, B:%0.3f, C:%0.3f ", _d->Vrms[0], _d->Vrms[1], _d->Vrms[2] ) );
     LOG(LL_INFO, ("IRMS A:%0.3f, B:%0.3f, C:%0.3f ", _d->Irms[0], _d->Irms[1], _d->Irms[2] ) );
-    LOG(LL_INFO, ("COSf A:%0.3f, B:%0.3f, C:%0.3f ", _d->Cosf[0], _d->Cosf[1], _d->Cosf[2] ) );
+    LOG(LL_INFO, ("Freq A:%0.3f, B:%0.3f, C:%0.3f ", _d->Freq[0], _d->Freq[1], _d->Freq[2] ) );
+    LOG(LL_INFO, ("V2C A:%0.3f, B:%0.3f, C:%0.3f ", _d->Angle_v2c[0], _d->Angle_v2c[1], _d->Angle_v2c[2] ) );
+    LOG(LL_INFO, ("V2V A:%0.3f, B:%0.3f, C:%0.3f ", _d->Angle_v2v[0], _d->Angle_v2v[1], _d->Angle_v2v[2] ) );
     LOG(LL_INFO, ("-------------------------------" ) );
 
 }
-
+void print_system_usage(){
+    LOG(LL_INFO, ("SystemUsage: heap(total/free):%d/%d, fs(total/free):%d/%d",
+            mgos_get_heap_size(),
+            mgos_get_free_heap_size(),
+            mgos_get_fs_size(),
+            mgos_get_free_fs_size()
+            ) );
+}
 void timer_cb_ad(void *arg) {
+/*
     ++_step;
     uint32_t data=0;
     ati_spi_ade7880_read32( ade, &data, CHECKSUM);
@@ -42,18 +52,16 @@ void timer_cb_ad(void *arg) {
     uint16_t run;
     ati_spi_ade7880_read16( ade, &run, 0xE228);
     LOG(LL_INFO, ("ADE7880 clock %d, RUN: %X", _step, run) );
-    if ( 1 != run ){
-        ati_spi_ade7880_reset(ade);
-        mgos_msleep(2000);
-    }
+
     uint32_t arms=0, brms=0, crms=0;
     ati_spi_ade7880_read32( ade, &arms, AVRMS);
     ati_spi_ade7880_read32( ade, &brms, BVRMS);
     ati_spi_ade7880_read32( ade, &crms, CVRMS);
     LOG(LL_INFO, ("ADE7880 READ %d, RMS AV: %X, BV: %X, CV: %X", _step, arms, brms, crms ) );
-    struct ati_spi_ade7880_data ade7880_data;
-    ati_spi_ade7880_get_data( ade, &ade7880_data);
-    print_unspa_data( &ade7880_data );
+*/
+    print_unspa_data( ati_spi_ade7880_get_data( ade ) );
+
+    print_system_usage();
 }
 
 enum mgos_app_init_result mgos_app_init(void) 

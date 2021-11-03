@@ -73,9 +73,10 @@ enum ADE_REGISTERS {
     
     CHECKSUM=0xE51F,     /*Checksum of configuration register, R*/
 
-    LAST_RWDATA32=0xE5FF,/*The data from last successful 32-bit register commutation,R */
-    LAST_RWDATA8=0xE7FD, /*The data from last successful 32-bit register commutation,R */
-
+    LAST_RWDATA32=0xE5FF,   /*The data from last successful 32-bit register commutation,R */
+    LAST_RWDATA16=0xE7FD,   /*The data from last successful 16-bit register commutation,R */
+    LAST_RWDATA8=0xE7FD,    /*The data from last successful 8-bit register commutation,R */
+    LAST_ADD=0xE9FE,        /*The address register from the last successful 16bit register communication*/
     PHSTATUS=0xE600,     /*Phase peak register, R,Tab.39 */
 
     ANGLE0=0xE601,      /*Time Delay 0, see Time Interval Between Phases, R */
@@ -102,7 +103,15 @@ enum ADE_REGISTERS {
     HZVHD=0xE89E,       /*Harmonic distortion of the phase voltage harmonic X relative to the fundamental, R*/
     HZIHD=0xE89F,       /*Harmonic distortion of the phase voltage harmonic X relative to the fundamental, R*/
 
-    CONFIG2=0xEC01      /*Configuration reg, R/W see Tab.55*/
+    CONFIG2=0xEC01,     /*Configuration reg, R/W see Tab.55*/
+
+    APERIOD=0xE905,     /*Line period of Phase A voltage, R, see Period Measurement */
+    BPERIOD=0xE906,     /*Line period of Phase A voltage, R, see Period Measurement */
+    CPERIOD=0xE907,     /*Line period of Phase A voltage, R, see Period Measurement */
+
+    COMPMODE=0xE60E,    /**/
+
+
 };
 
 #endif //MGOS_SPI_ADE7880_REGISTERS_H

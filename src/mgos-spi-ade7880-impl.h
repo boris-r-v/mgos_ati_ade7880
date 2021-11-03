@@ -10,6 +10,7 @@
 #include "mgos_spi.h"
 #include "mgos-spi-ade7880-registers.h"
 
+struct state;
 struct ati_spi_ade7880_calibration_data;
 struct ati_spi_ade7880{
     /**
@@ -36,6 +37,14 @@ struct ati_spi_ade7880{
     * Указательна структуру с данными калибровки, данный указатель должен быть валиден всегда
     */
     struct ati_spi_ade7880_calibration_data* coef;
+    /**
+    * Укзатель на структуру в которую сохраянем измренные данные
+    */
+    struct ati_spi_ade7880_sizing_data* data;
+    /**
+     *
+     */
+     struct state* angle_seq;
 };
 /**
  * Write gain, offset, thresholds dsp registers
@@ -99,6 +108,13 @@ uint8_t ati_spi_ade7880_read16( struct ati_spi_ade7880* _dev, uint16_t* _data, u
  * @return: ADE7880_OK if operation successful, or error code in overwise
  */
 uint8_t ati_spi_ade7880_read32( struct ati_spi_ade7880* _dev, uint32_t* _data, uint16_t _addr );
+/**
+ *
+ * @param _dev
+ * @param _addr
+ * @return
+ */
+uint16_t ati_spi_ade7880_get_uint16( struct ati_spi_ade7880* _dev, uint16_t _addr );
 /**
  * Get four byte signed number from register
  * @param _dev: ADE7880 spi device

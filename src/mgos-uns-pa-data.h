@@ -36,10 +36,13 @@ struct ati_spi_ade7880_calibration_data {
     float Coefficients_esp[4];
 };
 
-struct ati_spi_ade7880_data{
+struct ati_spi_ade7880_sizing_data{
     float Vrms[3];
     float Irms[3];
-    float Cosf[3];
+    float Freq[3];
+    float Angle_v2c[3];
+    float Angle_v2v[3];
+    float Angle_c2c[3];
 };
 
 /**

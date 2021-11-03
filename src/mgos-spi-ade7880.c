@@ -2,15 +2,25 @@
 // Created by boris on 26.10.2021.
 //
 #include "mgos_system.h"
+#include "mgos_timers.h"
 #include "mgos_debug.h"
 #include "mgos_gpio.h"
 #include "mgos-spi-ade7880.h"
 #include "mgos-spi-ade7880-impl.h"
 #include "mgos-uns-pa-data.h"
+#include "mgos-uns-pa-sizing-algo.h"
+
+#define _PERIOD_MS_ 10
+
+static void ati_spi_ade7880_periodic( void* _ptr );
 
 struct ati_spi_ade7880* ati_spi_ade7880_create(struct ati_spi_ade7880_config const* _conf){
     struct ati_spi_ade7880* c = (struct ati_spi_ade7880*) calloc(1, sizeof(*c));
-    if (NULL != c ){
+    if (NULL != c ) {
+        c->data = (struct ati_spi_ade7880_sizing_data*) calloc(1, sizeof(struct ati_spi_ade7880_sizing_data));
+        memset(c->data, 0x00, sizeof(struct ati_spi_ade7880_sizing_data) );
+    }
+    if (NULL != c && NULL != c->data){
         c->reset_pin = _conf->reset_pin;
         c->cs_pin = _conf->cs_pin;
         c->isol_pin = _conf->isol_pin;
@@ -30,6 +40,9 @@ struct ati_spi_ade7880* ati_spi_ade7880_create(struct ati_spi_ade7880_config con
 
         LOG (LL_INFO, ("UNS-PA SPI ADE7880 init ok (CS/RESET/ISOL: %d/%d/%d)",
                 c->cs_pin, c->reset_pin, c->isol_pin ));
+
+        c->angle_seq = create_angle_sizing_algo();
+        mgos_set_timer(_PERIOD_MS_, true, ati_spi_ade7880_periodic, c );
     }
     else{
         free (c);
@@ -83,19 +96,45 @@ void  ati_spi_ade7880_destroy(struct ati_spi_ade7880* _dev){
         LOG (LL_ERROR, ("UNS-PA SPI ADE7880 invalid destroy - device not exist!!" ) );
 }
 
-void ati_spi_ade7880_get_data(struct ati_spi_ade7880* _dev, struct ati_spi_ade7880_data* _data ){
+static void ati_spi_ade7880_periodic( void* _ptr ){
+    struct ati_spi_ade7880* _dev = (struct ati_spi_ade7880*)_ptr;
+    uint16_t run;
+    ati_spi_ade7880_read16( _dev, &run, RUN);
+    if ( 1 != run ){
+        LOG (LL_ERROR, ("UNS-PA SPI ADE7880 not work - reset it" ) );
+        ati_spi_ade7880_reset( _dev );
+        mgos_msleep(2000);
+    }
+
     float VGain = _dev->coef->Coefficients_esp[0];
     float VOffset = _dev->coef->Coefficients_esp[1];
     float IGain = _dev->coef->Coefficients_esp[2];
     float IOffset = _dev->coef->Coefficients_esp[3];
 
-    _data->Vrms[0] = ati_spi_ade7880_get_float( _dev, AVRMS) * VGain + VOffset;
-    _data->Vrms[1] = ati_spi_ade7880_get_float( _dev, BVRMS) * VGain + VOffset;
-    _data->Vrms[2] = ati_spi_ade7880_get_float( _dev, CVRMS) * VGain + VOffset;
+    _dev->data->Vrms[0] = ati_spi_ade7880_get_float( _dev, AVRMS) * VGain + VOffset;
+    _dev->data->Vrms[1] = ati_spi_ade7880_get_float( _dev, BVRMS) * VGain + VOffset;
+    _dev->data->Vrms[2] = ati_spi_ade7880_get_float( _dev, CVRMS) * VGain + VOffset;
 
-    _data->Irms[0] = ati_spi_ade7880_get_float( _dev, AIRMS) * IGain + IOffset;
-    _data->Irms[1] = ati_spi_ade7880_get_float( _dev, BIRMS) * IGain + IOffset;
-    _data->Irms[2] = ati_spi_ade7880_get_float( _dev, CVRMS) * IGain + IOffset;
+    _dev->data->Irms[0] = ati_spi_ade7880_get_float( _dev, AIRMS) * IGain + IOffset;
+    _dev->data->Irms[1] = ati_spi_ade7880_get_float( _dev, BIRMS) * IGain + IOffset;
+    _dev->data->Irms[2] = ati_spi_ade7880_get_float( _dev, CVRMS) * IGain + IOffset;
+    /*Read frequecy*/
+    uint16_t tmp;
+    ati_spi_ade7880_read16(_dev, &tmp, APERIOD );
+    _dev->data->Freq[0] = 256000.0 / tmp;
+    ati_spi_ade7880_read16(_dev, &tmp, BPERIOD );
+    _dev->data->Freq[1] = 256000.0 / tmp;
+    ati_spi_ade7880_read16(_dev, &tmp, CPERIOD );
+    _dev->data->Freq[2] = 256000.0 / tmp;
+
+    /*Handle Angle algo*/
+    if ( _dev->angle_seq->func(_dev, _dev->angle_seq )){
+        _dev->angle_seq = _dev->angle_seq->next;
+    }
+}
+
+struct ati_spi_ade7880_sizing_data const* ati_spi_ade7880_get_data(struct ati_spi_ade7880* _dev ){
+    return _dev->data;
 }
 
 
@@ -185,7 +224,11 @@ float ati_spi_ade7880_get_float( struct ati_spi_ade7880* _dev, uint16_t _addr ){
     ati_spi_ade7880_read32( _dev, &tmp, _addr );
     return ((float)tmp)/0x200000;
 }
-
+uint16_t ati_spi_ade7880_get_uint16( struct ati_spi_ade7880* _dev, uint16_t _addr ){
+    uint16_t tmp;
+    ati_spi_ade7880_read16( _dev, &tmp, _addr );
+    return tmp;
+}
 
 /**
  * Write some data block to ADE7880
